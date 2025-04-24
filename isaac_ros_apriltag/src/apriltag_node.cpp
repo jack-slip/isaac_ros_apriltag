@@ -631,6 +631,7 @@ struct AprilTagNode::CUAprilTagImpl : AprilTagNode::AprilTagImpl
       tfs.transforms.push_back(tf);
 
       // Pose
+      msg_detection.header = camera_info->header;
       msg_detection.pose.pose.pose.position.x = tf.transform.translation.x;
       msg_detection.pose.pose.pose.position.y = tf.transform.translation.y;
       msg_detection.pose.pose.pose.position.z = tf.transform.translation.z;
