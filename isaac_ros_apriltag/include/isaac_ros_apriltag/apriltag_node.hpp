@@ -18,9 +18,9 @@
 #ifndef ISAAC_ROS_APRILTAG__APRILTAG_NODE_HPP_
 #define ISAAC_ROS_APRILTAG__APRILTAG_NODE_HPP_
 
+#include <chrono>
 #include <memory>
 #include <string>
-#include <chrono>
 #include <utility>
 #include <vector>
 
@@ -32,8 +32,8 @@
 #include "tf2_ros/transform_broadcaster.h"
 
 #include "message_filters/subscriber.h"
-#include "message_filters/synchronizer.h"
 #include "message_filters/sync_policies/exact_time.h"
+#include "message_filters/synchronizer.h"
 
 #include "isaac_ros_managed_nitros/managed_nitros_message_filters_subscriber.hpp"
 #include "isaac_ros_nitros_image_type/nitros_image_view.hpp"
@@ -48,17 +48,22 @@ namespace apriltag
 class AprilTagNode : public rclcpp::Node
 {
 public:
-  explicit AprilTagNode(const rclcpp::NodeOptions & options = rclcpp::NodeOptions());
+  explicit AprilTagNode(
+      const rclcpp::NodeOptions& options = rclcpp::NodeOptions());
 
   ~AprilTagNode();
-  AprilTagNode(const AprilTagNode &) = delete;
-  AprilTagNode & operator=(const AprilTagNode &) = delete;
+  AprilTagNode(const AprilTagNode&) = delete;
+  AprilTagNode(AprilTagNode&&) = delete;
+  AprilTagNode& operator=(const AprilTagNode&) = delete;
+  AprilTagNode& operator=(AprilTagNode&&) = delete;
 
 private:
   void CameraImageCallback(
-    const nvidia::isaac_ros::nitros::NitrosImage::ConstSharedPtr & nitros_image,
-    const sensor_msgs::msg::CameraInfo::ConstSharedPtr & camera_info
-  );
+      const nvidia::isaac_ros::nitros::NitrosImage::ConstSharedPtr&
+          nitros_image,
+      const sensor_msgs::msg::CameraInfo::ConstSharedPtr& camera_info);
+
+  void printParams();
 
   // Parameters
   const int max_tags_;
@@ -66,24 +71,28 @@ private:
   const uint32_t tile_size_;
   const std::string tag_family_;
   const uint32_t backends_;
-
+  std::vector<uint16_t> tag_id_filter_;
+  std::unordered_map<uint16_t, double> tag_sizes_;
+  std::unordered_map<uint16_t, std::string> tag_names_;
   // Subscribers
-  template<typename T>
-  using NitrosMessageFilterSubscriber = nvidia::isaac_ros::nitros::message_filters::Subscriber<T>;
+  template <typename T>
+  using NitrosMessageFilterSubscriber
+      = nvidia::isaac_ros::nitros::message_filters::Subscriber<T>;
 
-  NitrosMessageFilterSubscriber<nvidia::isaac_ros::nitros::NitrosImageView> image_sub_;
+  NitrosMessageFilterSubscriber<nvidia::isaac_ros::nitros::NitrosImageView>
+      image_sub_;
   message_filters::Subscriber<sensor_msgs::msg::CameraInfo> camera_info_sub_;
 
   using ExactPolicy = message_filters::sync_policies::ExactTime<
-    nvidia::isaac_ros::nitros::NitrosImage,
-    sensor_msgs::msg::CameraInfo
-  >;
+      nvidia::isaac_ros::nitros::NitrosImage,
+      sensor_msgs::msg::CameraInfo>;
   message_filters::Synchronizer<ExactPolicy> camera_image_sync_;
 
   // Publishers
   const rclcpp::Publisher<tf2_msgs::msg::TFMessage>::SharedPtr tf_pub_;
-  const rclcpp::Publisher<isaac_ros_apriltag_interfaces::msg::AprilTagDetectionArray>::SharedPtr
-    detections_pub_;
+  const rclcpp::Publisher<
+      isaac_ros_apriltag_interfaces::msg::AprilTagDetectionArray>::SharedPtr
+      detections_pub_;
 
   struct CUAprilTagImpl;
   struct VPIAprilTagImpl;
@@ -91,8 +100,8 @@ private:
   std::unique_ptr<AprilTagImpl> impl_;
 };
 
-}  // namespace apriltag
-}  // namespace isaac_ros
-}  // namespace nvidia
+} // namespace apriltag
+} // namespace isaac_ros
+} // namespace nvidia
 
-#endif  // ISAAC_ROS_APRILTAG__APRILTAG_NODE_HPP_
+#endif // ISAAC_ROS_APRILTAG__APRILTAG_NODE_HPP_
