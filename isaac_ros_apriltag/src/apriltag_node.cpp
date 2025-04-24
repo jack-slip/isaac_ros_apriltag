@@ -571,6 +571,16 @@ struct AprilTagNode::CUAprilTagImpl : AprilTagNode::AprilTagImpl
     for (uint32_t i = 0; i < num_detections; i++) {
       const cuAprilTagsID_t& detection = tags[i];
 
+      // Check if the tag ID is in the filter
+      if (!node.tag_id_filter_.empty()
+          && std::find(
+                 node.tag_id_filter_.begin(),
+                 node.tag_id_filter_.end(),
+                 detection.id)
+                 == node.tag_id_filter_.end()) {
+        continue;
+      }
+
       // detection
       isaac_ros_apriltag_interfaces::msg::AprilTagDetection msg_detection;
       msg_detection.family = tag_family_str_;
@@ -597,13 +607,27 @@ struct AprilTagNode::CUAprilTagImpl : AprilTagNode::AprilTagImpl
           = (intercept_2 - intercept_1) / (slope_1 - slope_2);
       msg_detection.center.y = (slope_2 * intercept_1 - slope_1 * intercept_2)
                                / (slope_2 - slope_1);
-
       // Timestamped Pose3 transform
       geometry_msgs::msg::TransformStamped tf;
       tf.header = camera_info->header;
-      tf.child_frame_id
-          = std::string(tag_family_str_) + ":" + std::to_string(detection.id);
+      auto name_it = node.tag_names_.find(detection.id);
+      if (name_it != node.tag_names_.end()) {
+        tf.child_frame_id = name_it->second;
+      } else {
+        tf.child_frame_id
+            = std::string(tag_family_str_) + ":" + std::to_string(detection.id);
+      }
       tf.transform = ToTransformMsg(detection);
+
+      // Apply scaling based on custom size if defined
+      double tag_size = node.size_;
+      auto it = node.tag_sizes_.find(detection.id);
+      if (it != node.tag_sizes_.end()) {
+        tag_size = it->second;
+      }
+      tf.transform.translation.x *= (tag_size / node.size_);
+      tf.transform.translation.y *= (tag_size / node.size_);
+      tf.transform.translation.z *= (tag_size / node.size_);
       tfs.transforms.push_back(tf);
 
       // Pose
@@ -643,11 +667,13 @@ AprilTagNode::AprilTagNode(const rclcpp::NodeOptions& options) :
         isaac_ros_apriltag_interfaces::msg::AprilTagDetectionArray>(
         "tag_detections", rclcpp::QoS(1))}
 {
-  RCLCPP_INFO(
-      get_logger(),
-      "Using VPI implementation with backend mask: %d",
-      backends_);
-  impl_ = std::make_unique<AprilTagNode::VPIAprilTagImpl>();
+  if (backends_ == VPI_BACKEND_CUDA) {
+    RCLCPP_INFO(get_logger(), "Using cuAprilTag implementation.");
+    impl_ = std::make_unique<AprilTagNode::CUAprilTagImpl>();
+  } else {
+    RCLCPP_INFO(get_logger(), "Using VPI implementation.");
+    impl_ = std::make_unique<AprilTagNode::VPIAprilTagImpl>();
+  }
 
   auto supported_tag_families = impl_->SupportedTagFamilies();
   if (supported_tag_families.find(ToVPIAprilTagFamily(tag_family_))
